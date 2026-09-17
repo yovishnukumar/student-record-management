@@ -1,0 +1,6 @@
+{
+  "name": "In-Memory Database Storage Engine",
+  "description": "In-memory database engine with O(1) djb2 hash indexing, secondary Red-Black tree indexing, reference-counted heap memory, and HOT optimization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
