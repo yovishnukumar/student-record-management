@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { StorageEngine } from './engine/storageEngine';
 import { executeSqlStatement } from './engine/sqlParser';
 import { Header } from './components/Header';
+import { StudentDirectory } from './components/StudentDirectory';
 import { HashTableVisualizer } from './components/HashTableVisualizer';
 import { RedBlackTreeVisualizer } from './components/RedBlackTreeVisualizer';
 import { HeapMemoryVisualizer } from './components/HeapMemoryVisualizer';
@@ -25,8 +26,12 @@ function StorageEngineDashboard() {
   }
   const engine = engineRef.current;
 
+  // View state: default to simple and intuitive 'STUDENTS' view
+  const [currentView, setCurrentView] = useState<'STUDENTS' | 'ENGINE'>('STUDENTS');
+
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [isArchModalOpen, setIsArchModalOpen] = useState(false);
 
   // Force re-render helper
@@ -57,11 +62,25 @@ function StorageEngineDashboard() {
       });
   }, [engine, refreshUI]);
 
-  // Handler: Insert Student (In-Memory Engine + Cloud SQL sync)
-  const handleInsertStudent = useCallback(
+  // Handler: Insert / Update Student (In-Memory Engine + Cloud SQL sync)
+  const handleSaveStudent = useCallback(
     async (student: Student) => {
-      engine.insert(student);
+      const records = engine.heap.getAllRecords();
+      const existing = records.find((r) => r.data.rollNo === student.rollNo);
+
+      if (existing) {
+        // Update existing student
+        engine.update(student.rollNo, {
+          name: student.name,
+          department: student.department,
+          cgpa: student.cgpa,
+        });
+      } else {
+        // Insert new student
+        engine.insert(student);
+      }
       refreshUI();
+
       try {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -72,6 +91,25 @@ function StorageEngineDashboard() {
         });
       } catch (e) {
         console.warn('Failed to persist student to Cloud SQL:', e);
+      }
+    },
+    [engine, refreshUI, token]
+  );
+
+  // Handler: Delete student
+  const handleDeleteStudent = useCallback(
+    async (rollNo: string) => {
+      engine.delete(rollNo);
+      refreshUI();
+      try {
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        await fetch(`/api/students/${encodeURIComponent(rollNo)}`, {
+          method: 'DELETE',
+          headers,
+        });
+      } catch (e) {
+        console.warn('Failed to delete student from Cloud SQL:', e);
       }
     },
     [engine, refreshUI, token]
@@ -115,6 +153,22 @@ function StorageEngineDashboard() {
           body: JSON.stringify(item),
         }).catch((err) => console.warn('Sync failed for seeded student:', err));
       }
+      refreshUI();
+    },
+    [engine, refreshUI]
+  );
+
+  // Handler: Edit button clicked in table
+  const handleOpenEditModal = useCallback((student: Student) => {
+    setEditingStudent(student);
+    setIsAddModalOpen(true);
+  }, []);
+
+  // Handler: Inspect student in engine
+  const handleSelectStudentInEngine = useCallback(
+    (rollNo: string) => {
+      engine.findByRollNo(rollNo);
+      setCurrentView('ENGINE');
       refreshUI();
     },
     [engine, refreshUI]
@@ -261,17 +315,6 @@ function StorageEngineDashboard() {
     [engine, refreshUI]
   );
 
-  const handleQuickDelete = useCallback(
-    (rollNo: string) => {
-      engine.delete(rollNo);
-      refreshUI();
-      fetch(`/api/students/${encodeURIComponent(rollNo)}`, { method: 'DELETE' }).catch((e) =>
-        console.warn('Quick delete sync failed:', e)
-      );
-    },
-    [engine, refreshUI]
-  );
-
   const handleSelectRollNo = useCallback(
     (rollNo: string) => {
       engine.findByRollNo(rollNo);
@@ -295,79 +338,100 @@ function StorageEngineDashboard() {
   }, [engine, refreshUI]);
 
   const stats = engine.getStats();
+  const allStudents = engine.heap.getAllRecords().map((r) => r.data);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Top Header & System Metrics Strip */}
+      {/* Top Header & Navigation Switcher */}
       <Header
         stats={stats}
-        onOpenAddModal={() => setIsAddModalOpen(true)}
-        onSeedData={handleSeedData}
+        currentView={currentView}
+        onViewChange={setCurrentView}
+        onOpenAddModal={() => {
+          setEditingStudent(null);
+          setIsAddModalOpen(true);
+        }}
         onForceRehash={handleForceRehash}
         onOpenArchitectureModal={() => setIsArchModalOpen(true)}
         onReset={handleReset}
       />
 
-      {/* Main Workspace Dashboard */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-5">
-        {/* Row 1: Dual Index Architecture Side-by-Side */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
-          {/* Primary Key Hash Table with Separate Chaining */}
-          <div className="h-full">
-            <HashTableVisualizer
-              hashTable={engine.primaryIndex}
-              activeRollNo={engine.lastActiveRollNo}
-              onSelectRollNo={handleSelectRollNo}
-            />
-          </div>
-
-          {/* Secondary Analytical Index: Red-Black Tree on CGPA */}
-          <div className="h-full">
-            <RedBlackTreeVisualizer
-              tree={engine.secondaryIndex}
-              highlightedNodeIds={engine.lastHighlightedNodeIds}
-              onSelectRollNo={handleSelectRollNo}
-              onExecuteRangeScan={handleExecuteRangeScan}
-            />
-          </div>
-        </div>
-
-        {/* Row 2: SQL Query Console & EXPLAIN ANALYZE Planner */}
-        <div>
-          <QueryConsole
-            lastPlan={engine.lastPlan}
-            onExecuteSql={handleExecuteSql}
-            onRunPreset={handleRunPreset}
-          />
-        </div>
-
-        {/* Row 3: Address-Stable Heap Memory Pool */}
-        <div>
-          <HeapMemoryVisualizer
-            heap={engine.heap}
-            activeRollNo={engine.lastActiveRollNo}
-            onSelectRollNo={handleSelectRollNo}
-            onQuickHotUpdate={handleQuickHotUpdate}
-            onQuickNonHotUpdate={handleQuickNonHotUpdate}
-            onQuickDelete={handleQuickDelete}
-          />
-        </div>
-
-        {/* Row 4: Real-Time Engine Event & Memory Pointer Stream */}
-        <div>
-          <EngineLogViewer
-            logs={engine.logs}
-            onClearLogs={() => {
-              engine.logs = [];
-              refreshUI();
+      {/* Main Container */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6">
+        {currentView === 'STUDENTS' ? (
+          /* Primary Simple & Easy View: Student Directory */
+          <StudentDirectory
+            students={allStudents}
+            onOpenAddModal={() => {
+              setEditingStudent(null);
+              setIsAddModalOpen(true);
             }}
+            onEditStudent={handleOpenEditModal}
+            onDeleteStudent={handleDeleteStudent}
+            onSelectStudentInEngine={handleSelectStudentInEngine}
+            onSeedData={handleSeedData}
           />
-        </div>
+        ) : (
+          /* Secondary Engine & Internals View */
+          <div className="space-y-5">
+            {/* Dual Index Architecture Side-by-Side */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
+              <div className="h-full">
+                <HashTableVisualizer
+                  hashTable={engine.primaryIndex}
+                  activeRollNo={engine.lastActiveRollNo}
+                  onSelectRollNo={handleSelectRollNo}
+                />
+              </div>
+
+              <div className="h-full">
+                <RedBlackTreeVisualizer
+                  tree={engine.secondaryIndex}
+                  highlightedNodeIds={engine.lastHighlightedNodeIds}
+                  onSelectRollNo={handleSelectRollNo}
+                  onExecuteRangeScan={handleExecuteRangeScan}
+                />
+              </div>
+            </div>
+
+            {/* SQL Query Console & EXPLAIN ANALYZE Planner */}
+            <div>
+              <QueryConsole
+                lastPlan={engine.lastPlan}
+                onExecuteSql={handleExecuteSql}
+                onRunPreset={handleRunPreset}
+              />
+            </div>
+
+            {/* Address-Stable Heap Memory Pool */}
+            <div>
+              <HeapMemoryVisualizer
+                heap={engine.heap}
+                activeRollNo={engine.lastActiveRollNo}
+                onSelectRollNo={handleSelectRollNo}
+                onQuickHotUpdate={handleQuickHotUpdate}
+                onQuickNonHotUpdate={handleQuickNonHotUpdate}
+                onQuickDelete={handleDeleteStudent}
+              />
+            </div>
+
+            {/* Real-Time Engine Event & Memory Pointer Stream */}
+            <div>
+              <EngineLogViewer
+                logs={engine.logs}
+                onClearLogs={() => {
+                  engine.logs = [];
+                  refreshUI();
+                }}
+              />
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Footer */}
       <footer className="border-t border-slate-800 bg-slate-900/60 py-3 px-4 text-center text-xs text-slate-500 font-mono">
-        Student Record Management System • In-Memory Storage Engine Architecture • djb2 Hash Table (α &le; 0.75) • Red-Black Multimap • std::shared_ptr Heap
+        Student Record Management System • Persistent Cloud SQL Storage Engine
       </footer>
 
       {/* Modals */}
@@ -378,8 +442,12 @@ function StorageEngineDashboard() {
 
       <StudentFormModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onSubmit={handleInsertStudent}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setEditingStudent(null);
+        }}
+        onSubmit={handleSaveStudent}
+        initialStudent={editingStudent}
         nextSuggestedRollNo={`CS21B${(engine.heap.records.size + 1).toString().padStart(3, '0')}`}
       />
     </div>
