@@ -367,7 +367,7 @@ function StorageEngineDashboard() {
 
       {/* Footer */}
       <footer className="border-t border-slate-800 bg-slate-900/60 py-3 px-4 text-center text-xs text-slate-500 font-mono">
-        In-Memory Storage Engine Architecture • djb2 Hash Table (α &le; 0.75) • Red-Black Multimap • std::shared_ptr Heap
+        Student Record Management System • In-Memory Storage Engine Architecture • djb2 Hash Table (α &le; 0.75) • Red-Black Multimap • std::shared_ptr Heap
       </footer>
 
       {/* Modals */}

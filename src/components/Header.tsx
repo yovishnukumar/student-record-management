@@ -35,14 +35,14 @@ export const Header: React.FC<HeaderProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold text-slate-100 tracking-tight">
-                In-Memory Database Storage Engine
+                Student Record Management System
               </h1>
               <span className="text-xs px-2 py-0.5 rounded-full font-mono font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 ACTIVE
               </span>
             </div>
             <p className="text-xs text-slate-400 flex items-center gap-1.5">
-              <span>Dual-Index Architecture</span>
+              <span>In-Memory Storage Engine</span>
               <span className="text-slate-600">•</span>
               <span className="font-mono text-cyan-300">djb2 Hash Table</span>
               <span className="text-slate-600">+</span>

@@ -1,6 +1,6 @@
 {
-  "name": "In-Memory Database Storage Engine",
-  "description": "In-memory database engine with O(1) djb2 hash indexing, secondary Red-Black tree indexing, reference-counted heap memory, and HOT optimization.",
+  "name": "Student Record Management System",
+  "description": "Student Record Management System with high-performance in-memory database storage engine, O(1) djb2 hash indexing, and secondary Red-Black tree indexing.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

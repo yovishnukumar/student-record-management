@@ -3,6 +3,7 @@
   "appId": "1:324862152269:web:420ed7ace053dafc8e1604",
   "apiKey": "AIzaSyAn8F1nhFdb2XAgDpRw55QwAQpqJTO4a7g",
   "authDomain": "fabled-axon-9dx1j.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-inmemorydatabase-515a7f0d-f1ce-4a60-bfb8-de8e1828e4dd",
   "storageBucket": "fabled-axon-9dx1j.firebasestorage.app",
   "messagingSenderId": "324862152269",
   "measurementId": "",
